@@ -224,14 +224,6 @@ public class FormServiceImpl implements FormService {
                 return false;
             }
         }
-        if("TEXT".equalsIgnoreCase(dataTypeName)) {
-            try {
-                String.valueOf(value);
-                return true;
-            } catch (NumberFormatException e) {
-                return false;
-            }
-        }
         return true;
     }
 
