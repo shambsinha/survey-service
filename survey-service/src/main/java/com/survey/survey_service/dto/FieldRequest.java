@@ -11,4 +11,5 @@ public class FieldRequest {
     private Long dataTypeId;
     private Boolean isRequired;
     private Integer displayOrder;
+    private String optionsJson;
 }

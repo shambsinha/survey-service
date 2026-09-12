@@ -6,7 +6,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class AnswerDetail {
-    private Long submissionId;
+    private Long submittedBy;
     private String value;
     private Long userId;
 }

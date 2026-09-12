@@ -13,7 +13,7 @@ public interface FormService {
 
     List<FieldAnswersResponse> getFormResults(Long formId);
 
-    boolean validateField(String dataTypeName, String value);
+    boolean validateField(String dataTypeName, String value, String optionsJson);
 
 
 }

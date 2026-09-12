@@ -23,10 +23,14 @@ public class Field {
     
     @Column(name = "data_type_id")
     private Long dataTypeId;
-    
+    @Column(name="name")
     private String name;
+    @Column(name="label")
     private String label;
     
     @Column(name = "is_default")
     private Boolean isDefault;
+
+    @Column(name = "options_json")
+    private String optionsJson;
 }

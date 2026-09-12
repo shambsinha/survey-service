@@ -11,8 +11,8 @@ public class FormValue {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name = "submission_id")
-    private Long submissionId;
+    @Column(name = "submitted_by")
+    private Long submittedBy;
     
     @Column(name = "form_id")
     private Long formId;

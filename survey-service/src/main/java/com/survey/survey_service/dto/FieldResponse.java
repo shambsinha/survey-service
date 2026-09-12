@@ -12,4 +12,5 @@ public class FieldResponse {
     private Long dataTypeId;
     private Boolean isRequired;
     private Integer displayOrder;
+    private String optionsJson;
 }

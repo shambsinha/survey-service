@@ -1,8 +1,9 @@
 package com.survey.survey_service.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.survey.survey_service.dto.*;
 import com.survey.survey_service.entity.*;
-import com.survey.survey_service.enums.Sort;
 import com.survey.survey_service.repository.*;
 import com.survey.survey_service.service.FormService;
 import org.springframework.stereotype.Service;
@@ -11,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -61,6 +61,7 @@ public class FormServiceImpl implements FormService {
             fr.setName(defaultField.getName());
             fr.setLabel(defaultField.getLabel());
             fr.setDataTypeId(defaultField.getDataTypeId());
+            fr.setOptionsJson(defaultField.getOptionsJson());
             fr.setIsRequired(true);
             fr.setDisplayOrder(mapping.getDisplayOrder());
             fieldResponses.add(fr);
@@ -76,6 +77,7 @@ public class FormServiceImpl implements FormService {
                 field.setDataTypeId(fr.getDataTypeId());
                 field.setName(fr.getName());
                 field.setLabel(fr.getLabel());
+                field.setOptionsJson(fr.getOptionsJson());
                 field.setIsDefault(false);
                 field = fieldRepository.save(field);
 
@@ -93,6 +95,7 @@ public class FormServiceImpl implements FormService {
                 fieldResponse.setName(field.getName());
                 fieldResponse.setLabel(field.getLabel());
                 fieldResponse.setDataTypeId(field.getDataTypeId());
+                fieldResponse.setOptionsJson(field.getOptionsJson());
                 fieldResponse.setIsRequired(mapping.getIsRequired());
                 fieldResponse.setDisplayOrder(mapping.getDisplayOrder());
                 fieldResponses.add(fieldResponse);
@@ -123,6 +126,7 @@ public class FormServiceImpl implements FormService {
                 fr.setName(field.getName());
                 fr.setLabel(field.getLabel());
                 fr.setDataTypeId(field.getDataTypeId());
+                fr.setOptionsJson(field.getOptionsJson());
                 fr.setIsRequired(mapping.getIsRequired());
                 fr.setDisplayOrder(mapping.getDisplayOrder());
                 fieldResponses.add(fr);
@@ -153,13 +157,13 @@ public class FormServiceImpl implements FormService {
                 DataType dataType = dataTypeRepository.findById(field.getDataTypeId())
                         .orElseThrow(() -> new RuntimeException("datatype not found"));
 
-                boolean isValid = this.validateField(dataType.getName(), submittedValue);
+                boolean isValid = this.validateField(dataType.getName(), submittedValue, field.getOptionsJson());
                 if (!isValid) {
                     throw new RuntimeException("invalid data type");
                 }
 
                 FormValue formValue = new FormValue();
-                formValue.setSubmissionId(uId);
+                formValue.setSubmittedBy(uId);
                 formValue.setFormId(formId);
                 formValue.setFieldId(fieldId);
                 formValue.setValue(submittedValue);
@@ -185,6 +189,7 @@ public class FormServiceImpl implements FormService {
                 fieldDto.setName(field.getName());
                 fieldDto.setLabel(field.getLabel());
                 fieldDto.setDataTypeId(field.getDataTypeId());
+                fieldDto.setOptionsJson(field.getOptionsJson());
                 fieldDto.setIsRequired(mapping.getIsRequired());
                 fieldDto.setDisplayOrder(mapping.getDisplayOrder());
 
@@ -195,7 +200,7 @@ public class FormServiceImpl implements FormService {
 
                 for (FormValue value : fieldValues) {
                     AnswerDetail ans = new AnswerDetail();
-                    ans.setSubmissionId(value.getSubmissionId());
+                    ans.setSubmittedBy(value.getSubmittedBy());
                     ans.setValue(value.getValue());
                     ans.setUserId(value.getId());
 
@@ -212,7 +217,7 @@ public class FormServiceImpl implements FormService {
     }
 
     @Override
-    public boolean validateField(String dataTypeName, String value) {
+    public boolean validateField(String dataTypeName, String value, String optionsJson) {
         if (value == null || value.trim().isEmpty()) {
             return true;
         }
@@ -222,6 +227,29 @@ public class FormServiceImpl implements FormService {
                 return true;
             } catch (NumberFormatException e) {
                 return false;
+            }
+        }
+        if ("DROPDOWN".equalsIgnoreCase(dataTypeName) || "MULTISELECT".equalsIgnoreCase(dataTypeName)) {
+            if (optionsJson != null && !optionsJson.trim().isEmpty()) {
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    List<String> opts = mapper.readValue(optionsJson, new TypeReference<List<String>>(){});
+                    
+                    if ("MULTISELECT".equalsIgnoreCase(dataTypeName)) {
+                        List<String> userVals = mapper.readValue(value, new TypeReference<List<String>>(){});
+                        for (String v : userVals) {
+                            if (!opts.contains(v)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    } else {
+                        return opts.contains(value);
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    return false;
+                }
             }
         }
         return true;
