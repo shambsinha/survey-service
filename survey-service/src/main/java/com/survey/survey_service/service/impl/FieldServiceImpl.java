@@ -1,11 +1,14 @@
 package com.survey.survey_service.service.impl;
 
 import com.survey.survey_service.dto.FieldRequest;
+import com.survey.survey_service.dto.SystemFieldResponse;
 import com.survey.survey_service.entity.Field;
 import com.survey.survey_service.enums.DataType;
 import com.survey.survey_service.repository.FieldRepository;
 import com.survey.survey_service.service.FieldService;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class FieldServiceImpl implements FieldService {
@@ -29,5 +32,21 @@ public class FieldServiceImpl implements FieldService {
         field.setUpdatedBy(userId);
         
         return fieldRepository.save(field);
+    }
+
+    @Override
+    public List<SystemFieldResponse> getSystemFields() {
+        return fieldRepository.findByIsSystemTrue().stream().map(field -> {
+            SystemFieldResponse response = new SystemFieldResponse();
+            response.setId(field.getId());
+            response.setName(field.getName());
+            response.setLabel(field.getLabel());
+            if (field.getDataType() != null) {
+                response.setDataType(field.getDataType().name());
+            }
+            response.setIsDefault(field.getIsDefault());
+            response.setOptionsJson(field.getOptionsJson());
+            return response;
+        }).toList();
     }
 }

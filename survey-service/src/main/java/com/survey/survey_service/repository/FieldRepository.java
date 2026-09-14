@@ -16,4 +16,6 @@ public interface FieldRepository extends JpaRepository<Field, Long> {
     @Modifying
     @Query("DELETE FROM Field f WHERE f.id IN :ids AND f.isSystem = false")
     void deleteCustomFieldsByIds(@Param("ids") List<Long> ids);
+
+    List<Field> findByIsSystemTrue();
 }
