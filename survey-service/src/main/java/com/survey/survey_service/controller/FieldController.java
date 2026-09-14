@@ -1,7 +1,7 @@
 package com.survey.survey_service.controller;
 
 import com.survey.survey_service.dto.FieldRequest;
-import com.survey.survey_service.dto.SystemFieldResponse;
+import com.survey.survey_service.dto.FieldResponse;
 import com.survey.survey_service.entity.Field;
 import com.survey.survey_service.service.FieldService;
 import org.springframework.http.ResponseEntity;
@@ -31,7 +31,7 @@ public class FieldController {
 
     @GetMapping("/system")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<List<SystemFieldResponse>> getSystemFields() {
+    public ResponseEntity<List<FieldResponse>> getSystemFields() {
         return ResponseEntity.ok(fieldService.getSystemFields());
     }
 }

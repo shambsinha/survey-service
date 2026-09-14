@@ -1,7 +1,7 @@
 package com.survey.survey_service.service.impl;
 
 import com.survey.survey_service.dto.FieldRequest;
-import com.survey.survey_service.dto.SystemFieldResponse;
+import com.survey.survey_service.dto.FieldResponse;
 import com.survey.survey_service.entity.Field;
 import com.survey.survey_service.enums.DataType;
 import com.survey.survey_service.repository.FieldRepository;
@@ -35,16 +35,15 @@ public class FieldServiceImpl implements FieldService {
     }
 
     @Override
-    public List<SystemFieldResponse> getSystemFields() {
+    public List<FieldResponse> getSystemFields() {
         return fieldRepository.findByIsSystemTrue().stream().map(field -> {
-            SystemFieldResponse response = new SystemFieldResponse();
-            response.setId(field.getId());
+            FieldResponse response = new FieldResponse();
+            response.setFieldId(field.getId());
             response.setName(field.getName());
             response.setLabel(field.getLabel());
             if (field.getDataType() != null) {
                 response.setDataType(field.getDataType().name());
             }
-            response.setIsDefault(field.getIsDefault());
             response.setOptionsJson(field.getOptionsJson());
             return response;
         }).toList();
