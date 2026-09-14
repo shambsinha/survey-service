@@ -5,6 +5,7 @@ import com.survey.survey_service.enums.DataType;
 import com.survey.survey_service.entity.*;
 import com.survey.survey_service.repository.*;
 import com.survey.survey_service.service.FormService;
+import com.survey.survey_service.validator.FieldValidatorMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
@@ -28,14 +29,14 @@ public class FormServiceImpl implements FormService {
     private final FieldRepository fieldRepository;
     private final FormFieldMappingRepository formFieldMappingRepository;
     private final FormValueRepository formValueRepository;
-    private final List<FieldValidator> validators;
+    private final FieldValidatorMap validatorMap;
     
-    public FormServiceImpl(FormRepository formRepository, FieldRepository fieldRepository, FormFieldMappingRepository formFieldMappingRepository, FormValueRepository formValueRepository, List<FieldValidator> validators) {
+    public FormServiceImpl(FormRepository formRepository, FieldRepository fieldRepository, FormFieldMappingRepository formFieldMappingRepository, FormValueRepository formValueRepository, FieldValidatorMap validatorMap) {
         this.formRepository = formRepository;
         this.fieldRepository = fieldRepository;
         this.formFieldMappingRepository = formFieldMappingRepository;
         this.formValueRepository = formValueRepository;
-        this.validators = validators;
+        this.validatorMap=validatorMap;
     }
 
     @Override
@@ -231,9 +232,8 @@ public class FormServiceImpl implements FormService {
             Field field = fields.get(entry.getKey());
             if (field == null) throw new RuntimeException("field not found");
 
-            boolean isValid = validators.stream()
-                    .filter(v -> v.supports(field.getDataType())).findFirst()
-                    .map(v -> v.validate(entry.getValue(), field.getOptionsJson())).orElse(true);
+            FieldValidator validator = validatorMap.getValidator(field.getDataType());
+            boolean isValid = validator != null ? validator.validate(entry.getValue(), field.getOptionsJson()) : true;
 
             if (!isValid) throw new RuntimeException("invalid data type");
 
