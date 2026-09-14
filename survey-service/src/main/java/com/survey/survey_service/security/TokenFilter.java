@@ -52,7 +52,7 @@ public class TokenFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
             } catch (Exception e) {
-
+                throw new RuntimeException("Failed to validate token: " + e.getMessage());
             }
         }
         chain.doFilter(request, response);

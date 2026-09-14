@@ -5,6 +5,7 @@ import com.survey.survey_service.entity.Field;
 import com.survey.survey_service.service.FieldService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,7 +24,7 @@ public class FieldController {
     @PostMapping("/system")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Field> createSystemField(@RequestBody FieldRequest request) {
-        Long userId = (Long) org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Field savedField = fieldService.createSystemField(request, userId);
         return ResponseEntity.ok(savedField);
     }

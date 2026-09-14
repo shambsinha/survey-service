@@ -2,8 +2,10 @@ package com.survey.survey_service.controller;
 
 import com.survey.survey_service.dto.LoginRequest;
 import com.survey.survey_service.dto.LoginResponse;
+import com.survey.survey_service.dto.RegisterRequest;
 import com.survey.survey_service.service.AuthService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,7 +27,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody com.survey.survey_service.dto.RegisterRequest request) {
+    public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
         authService.register(request);
         return ResponseEntity.ok("User registered!!!!!!!");
     }

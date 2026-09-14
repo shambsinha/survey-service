@@ -2,6 +2,7 @@ package com.survey.survey_service.service.impl;
 
 import com.survey.survey_service.dto.*;
 import com.survey.survey_service.entity.User;
+import com.survey.survey_service.enums.Role;
 import com.survey.survey_service.repository.UserRepository;
 import com.survey.survey_service.service.AuthService;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -58,7 +59,7 @@ public class AuthServiceImpl implements AuthService {
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(request.getPassword());
-        user.setRole(com.survey.survey_service.enums.Role.USER.name());
+        user.setRole(Role.USER.name());
         userRepository.save(user);
     }
 }
