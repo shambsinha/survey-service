@@ -8,7 +8,7 @@ import lombok.Setter;
 public class FieldRequest {
     private String name;
     private String label;
-    private Long dataTypeId;
+    private String dataType;
     private Boolean isRequired;
     private Integer displayOrder;
     private String optionsJson;

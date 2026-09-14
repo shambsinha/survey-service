@@ -9,7 +9,7 @@ public class FieldResponse {
     private Long fieldId;
     private String name;
     private String label;
-    private Long dataTypeId;
+    private String dataType;
     private Boolean isRequired;
     private Integer displayOrder;
     private String optionsJson;

@@ -6,11 +6,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.time.Instant;
+import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface FormRepository extends JpaRepository<Form, Long> {
 
 
-    @Query("SELECT f.id FROM Form f")
-    List<Long> findAllFormIds();
+
+    @Query("SELECT f.id FROM Form f WHERE f.createdAt < :cutoffDate")
+    List<Long> findFormIdsCreatedBefore(@Param("cutoffDate") Instant cutoffDate);
+
 }

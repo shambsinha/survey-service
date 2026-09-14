@@ -1,12 +1,12 @@
 package com.survey.survey_service.service.impl;
 
-import com.survey.survey_service.dto.LoginRequest;
-import com.survey.survey_service.dto.LoginResponse;
+import com.survey.survey_service.dto.*;
 import com.survey.survey_service.entity.User;
 import com.survey.survey_service.repository.UserRepository;
 import com.survey.survey_service.service.AuthService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -26,12 +26,21 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public LoginResponse login(LoginRequest request) {
         Optional<User> userdetails = userRepository.findByUsername(request.getUsername());
-        
         if (userdetails.isPresent()) {
             User user = userdetails .get();
             if (user.getPassword().equals(request.getPassword())) {
                 String token = UUID.randomUUID().toString();
-                redisTemplate.opsForValue().set(token, user.getId().toString(), 30, TimeUnit.DAYS);
+                
+                SessionUser sessionUser = new SessionUser(user.getId(), user.getUsername(), user.getRole());
+                try {
+                    ObjectMapper mapper = new ObjectMapper();
+                    String sessionJson = mapper.writeValueAsString(sessionUser);
+                    redisTemplate.opsForValue().set(token, sessionJson, 30, TimeUnit.DAYS);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    throw new RuntimeException("Failed to create session: " + e.getMessage());
+                }
+
                 LoginResponse response = new LoginResponse();
                 response.setToken(token);
                 response.setMessage("Login successful");

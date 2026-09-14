@@ -1,18 +1,25 @@
 package com.survey.survey_service.service.impl;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.survey.survey_service.dto.*;
+import com.survey.survey_service.enums.DataType;
 import com.survey.survey_service.entity.*;
 import com.survey.survey_service.repository.*;
 import com.survey.survey_service.service.FormService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageImpl;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import com.survey.survey_service.validator.FieldValidator;
 
 @Service
 public class FormServiceImpl implements FormService {
@@ -21,238 +28,251 @@ public class FormServiceImpl implements FormService {
     private final FieldRepository fieldRepository;
     private final FormFieldMappingRepository formFieldMappingRepository;
     private final FormValueRepository formValueRepository;
-    private final DataTypeRepository dataTypeRepository;
-
-    public FormServiceImpl(FormRepository formRepository, 
-                           FieldRepository fieldRepository, 
-                           FormFieldMappingRepository formFieldMappingRepository,
-                           FormValueRepository formValueRepository,
-                           DataTypeRepository dataTypeRepository) {
+    private final List<FieldValidator> validators;
+    
+    public FormServiceImpl(FormRepository formRepository, FieldRepository fieldRepository, FormFieldMappingRepository formFieldMappingRepository, FormValueRepository formValueRepository, List<FieldValidator> validators) {
         this.formRepository = formRepository;
         this.fieldRepository = fieldRepository;
         this.formFieldMappingRepository = formFieldMappingRepository;
         this.formValueRepository = formValueRepository;
-        this.dataTypeRepository = dataTypeRepository;
+        this.validators = validators;
+    }
+
+    @Override
+    @Transactional
+    public void deleteUnansweredForms() {
+        Instant thirtyDaysAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+        List<Long> formIds = formRepository.findFormIdsCreatedBefore(thirtyDaysAgo);
+        List<Long> formIds2 = formValueRepository.findAllFormIdsInValues();
+        List<Long> toDelete = new ArrayList<>();
+        
+        for (Long formId : formIds) {
+            if (!formIds2.contains(formId)) {
+                toDelete.add(formId);
+            }
+        }
+
+        if (!toDelete.isEmpty()) {
+            List<Long> fieldsToDelete = formFieldMappingRepository.findByIdsIn(toDelete);
+            formRepository.deleteAllById(toDelete);
+            if (fieldsToDelete != null && !fieldsToDelete.isEmpty()) {
+                fieldRepository.deleteCustomFieldsByIds(fieldsToDelete);
+            }
+        }
     }
 
     @Override
     @Transactional
     public FormResponse createForm(FormCreateRequest request) {
-        Form form = new Form();
-        form.setUserId(request.getUserId());
-        form.setTitle(request.getTitle());
-        form.setDescription(request.getDescription());
-        form = formRepository.save(form);
-
-        List<FieldResponse> fieldResponses = new ArrayList<>();
-        int currentDisplayOrder = 1;
-
+        Form form = saveNewForm(request);
+        List<FormFieldMapping> mappings = new ArrayList<>();
+        
         List<Field> defaultFields = fieldRepository.findByIsDefaultTrue();
-        for (Field defaultField : defaultFields) {
-            FormFieldMapping mapping = new FormFieldMapping();
-            mapping.setFormId(form.getId());
-            mapping.setFieldId(defaultField.getId());
-            mapping.setIsRequired(true);
-            mapping.setDisplayOrder(currentDisplayOrder++);
-            formFieldMappingRepository.save(mapping);
-
-            FieldResponse fr = new FieldResponse();
-            fr.setFieldId(defaultField.getId());
-            fr.setName(defaultField.getName());
-            fr.setLabel(defaultField.getLabel());
-            fr.setDataTypeId(defaultField.getDataTypeId());
-            fr.setOptionsJson(defaultField.getOptionsJson());
-            fr.setIsRequired(true);
-            fr.setDisplayOrder(mapping.getDisplayOrder());
-            fieldResponses.add(fr);
-        }
-        if (request.getFields() != null) {
-            for (FieldRequest fr : request.getFields()) {
-                if (!dataTypeRepository.existsById(fr.getDataTypeId())) {
-                    throw new RuntimeException("invalid data type id");
-                }
-                
-                Field field = new Field();
-                field.setUserId(request.getUserId());
-                field.setDataTypeId(fr.getDataTypeId());
-                field.setName(fr.getName());
-                field.setLabel(fr.getLabel());
-                field.setOptionsJson(fr.getOptionsJson());
-                field.setIsDefault(false);
-                field = fieldRepository.save(field);
-
-                FormFieldMapping mapping = new FormFieldMapping();
-                mapping.setFormId(form.getId());
-                mapping.setFieldId(field.getId());
-                mapping.setIsRequired(fr.getIsRequired());
-
-                int order = (fr.getDisplayOrder() != null) ? fr.getDisplayOrder() : currentDisplayOrder++;
-                mapping.setDisplayOrder(order);
-                formFieldMappingRepository.save(mapping);
-
-                FieldResponse fieldResponse = new FieldResponse();
-                fieldResponse.setFieldId(field.getId());
-                fieldResponse.setName(field.getName());
-                fieldResponse.setLabel(field.getLabel());
-                fieldResponse.setDataTypeId(field.getDataTypeId());
-                fieldResponse.setOptionsJson(field.getOptionsJson());
-                fieldResponse.setIsRequired(mapping.getIsRequired());
-                fieldResponse.setDisplayOrder(mapping.getDisplayOrder());
-                fieldResponses.add(fieldResponse);
-            }
+        mappings.addAll(createMappings(form.getId(), request.getUserId(), defaultFields, 1, true));
+        
+        if (request.getFields() != null && !request.getFields().isEmpty()) {
+            List<Field> customFields = saveCustomFields(request);
+            mappings.addAll(createCustomMappings(form.getId(), request, customFields, defaultFields.size() + 1));
         }
 
-        FormResponse response = new FormResponse();
-        response.setId(form.getId());
-        response.setTitle(form.getTitle());
-        response.setDescription(form.getDescription());
-        response.setFields(fieldResponses);
-
-        return response;
+        formFieldMappingRepository.saveAll(mappings);
+        return buildFormResponse(form, mappings);
     }
 
     @Override
     public FormResponse getForm(Long formId) {
-        Form form = formRepository.findById(formId)
-                .orElseThrow(() -> new RuntimeException("Form not found"));
-
-        List<FormFieldMapping> mappings = formFieldMappingRepository.findByFormId(formId);
-        List<FieldResponse> fieldResponses = new ArrayList<>();
-
-        for (FormFieldMapping mapping : mappings) {
-            fieldRepository.findById(mapping.getFieldId()).ifPresent(field -> {
-                FieldResponse fr = new FieldResponse();
-                fr.setFieldId(field.getId());
-                fr.setName(field.getName());
-                fr.setLabel(field.getLabel());
-                fr.setDataTypeId(field.getDataTypeId());
-                fr.setOptionsJson(field.getOptionsJson());
-                fr.setIsRequired(mapping.getIsRequired());
-                fr.setDisplayOrder(mapping.getDisplayOrder());
-                fieldResponses.add(fr);
-            });
-        }
-
-        FormResponse response = new FormResponse();
-        response.setId(form.getId());
-        response.setTitle(form.getTitle());
-        response.setDescription(form.getDescription());
-        response.setFields(fieldResponses);
-
-        return response;
+        Form form = formRepository.findById(formId).orElseThrow(() -> new RuntimeException("Form not found"));
+        return buildFormResponse(form, formFieldMappingRepository.findByFormId(formId));
     }
 
     @Override
     @Transactional
     public void submitForm(Long formId, FormSubmissionRequest request, Long uId) {
-
-        if (request.getValues() != null) {
-            for (Map.Entry<Long, String> entry : request.getValues().entrySet()) {
-                Long fieldId = entry.getKey();
-                String submittedValue = entry.getValue();
-
-                Field field = fieldRepository.findById(fieldId)
-                        .orElseThrow(() -> new RuntimeException("field not found"));
-
-                DataType dataType = dataTypeRepository.findById(field.getDataTypeId())
-                        .orElseThrow(() -> new RuntimeException("datatype not found"));
-
-                boolean isValid = this.validateField(dataType.getName(), submittedValue, field.getOptionsJson());
-                if (!isValid) {
-                    throw new RuntimeException("invalid data type");
-                }
-
-                FormValue formValue = new FormValue();
-                formValue.setSubmittedBy(uId);
-                formValue.setFormId(formId);
-                formValue.setFieldId(fieldId);
-                formValue.setValue(submittedValue);
-                formValueRepository.save(formValue);
-            }
-        }
-    }
-
-    @Override
-    public List<FieldAnswersResponse> getFormResults(Long formId) {
-        List<FormValue> allValues = formValueRepository.findByFormId(formId);
         List<FormFieldMapping> mappings = formFieldMappingRepository.findByFormId(formId);
-        Map<Long, List<FormValue>> valuesByFieldId = allValues.stream()
-                .collect(Collectors.groupingBy(FormValue::getFieldId));
+        Map<Long, String> submittedValues = request.getValues() != null ? request.getValues() : new HashMap<>();
+        
+        validateRequiredFields(mappings, submittedValues);
 
-        List<FieldAnswersResponse> resultList = new ArrayList<>();
-
-        for (FormFieldMapping mapping : mappings) {
-            Field field = fieldRepository.findById(mapping.getFieldId()).orElse(null);
-            if (field != null) {
-                FieldResponse fieldDto = new FieldResponse();
-                fieldDto.setFieldId(field.getId());
-                fieldDto.setName(field.getName());
-                fieldDto.setLabel(field.getLabel());
-                fieldDto.setDataTypeId(field.getDataTypeId());
-                fieldDto.setOptionsJson(field.getOptionsJson());
-                fieldDto.setIsRequired(mapping.getIsRequired());
-                fieldDto.setDisplayOrder(mapping.getDisplayOrder());
-
-                List<AnswerDetail> answers = new ArrayList<>();
-
-
-                List<FormValue> fieldValues = valuesByFieldId.getOrDefault(field.getId(), new ArrayList<>());
-
-                for (FormValue value : fieldValues) {
-                    AnswerDetail ans = new AnswerDetail();
-                    ans.setSubmittedBy(value.getSubmittedBy());
-                    ans.setValue(value.getValue());
-                    ans.setUserId(value.getId());
-
-                    answers.add(ans);
-                }
-                FieldAnswersResponse response = new FieldAnswersResponse();
-                response.setField(fieldDto);
-                response.setAnswers(answers);
-                resultList.add(response);
-            }
+        if (!submittedValues.isEmpty()) {
+            Map<Long, Field> fields = fetchFields(new ArrayList<>(submittedValues.keySet()));
+            List<FormValue> vals = createFormValues(formId, uId, submittedValues, fields);
+            formValueRepository.saveAll(vals);
         }
-
-        return resultList;
     }
 
     @Override
-    public boolean validateField(String dataTypeName, String value, String optionsJson) {
-        if (value == null || value.trim().isEmpty()) {
-            return true;
+    public Page<FieldAnswersResponse> getFormResults(Long formId, Long requestingUserId, Pageable pageable) {
+        Form form = formRepository.findById(formId).orElseThrow(() -> new RuntimeException("Form not found"));
+        if (!form.getCreatedBy().equals(requestingUserId)) {
+            throw new RuntimeException("Unauthorized: You do not have permission to view these results");
         }
-        if ("NUMBER".equalsIgnoreCase(dataTypeName)) {
-            try {
-                Double.parseDouble(value);
-                return true;
-            } catch (NumberFormatException e) {
-                return false;
+        
+        Page<FormFieldMapping> mappingPage = formFieldMappingRepository.findByFormId(formId, pageable);
+        List<FormFieldMapping> mappings = mappingPage.getContent();
+        
+        List<Long> fieldIds = mappings.stream().map(FormFieldMapping::getFieldId).toList();
+        Map<Long, List<FormValue>> valuesByFieldId = new HashMap<>();
+        
+        if (!fieldIds.isEmpty()) {
+            valuesByFieldId = formValueRepository.findByFormIdAndFieldIdIn(formId, fieldIds).stream()
+                    .collect(Collectors.groupingBy(FormValue::getFieldId));
+        }
+
+        Map<Long, Field> fields = fetchFields(fieldIds);
+        List<FieldAnswersResponse> results = new ArrayList<>();
+        
+        for (FormFieldMapping mapping : mappings) {
+            Field field = fields.get(mapping.getFieldId());
+            if (field != null) {
+                results.add(buildFieldAnswersResponse(field, mapping, valuesByFieldId.getOrDefault(field.getId(), new ArrayList<>())));
             }
         }
-        if ("DROPDOWN".equalsIgnoreCase(dataTypeName) || "MULTISELECT".equalsIgnoreCase(dataTypeName)) {
-            if (optionsJson != null && !optionsJson.trim().isEmpty()) {
-                try {
-                    ObjectMapper mapper = new ObjectMapper();
-                    List<String> opts = mapper.readValue(optionsJson, new TypeReference<List<String>>(){});
-                    
-                    if ("MULTISELECT".equalsIgnoreCase(dataTypeName)) {
-                        List<String> userVals = mapper.readValue(value, new TypeReference<List<String>>(){});
-                        for (String v : userVals) {
-                            if (!opts.contains(v)) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    } else {
-                        return opts.contains(value);
-                    }
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    return false;
+        
+        return new PageImpl<>(results, pageable, mappingPage.getTotalElements());
+    }
+
+    private Form saveNewForm(FormCreateRequest request) {
+        Form form = new Form();
+        form.setCreatedBy(request.getUserId());
+        form.setUpdatedBy(request.getUserId());
+        form.setTitle(request.getTitle());
+        form.setDescription(request.getDescription());
+        return formRepository.save(form);
+    }
+
+    private List<Field> saveCustomFields(FormCreateRequest request) {
+        List<Field> customFields = new ArrayList<>();
+        for (FieldRequest fr : request.getFields()) {
+            Field field = new Field();
+            field.setDataType(DataType.valueOf(fr.getDataType().toUpperCase()));
+            field.setName(fr.getName());
+            field.setLabel(fr.getLabel());
+            field.setOptionsJson(fr.getOptionsJson());
+            field.setIsDefault(false);
+            field.setCreatedBy(request.getUserId());
+            field.setUpdatedBy(request.getUserId());
+            customFields.add(field);
+        }
+        return fieldRepository.saveAll(customFields);
+    }
+
+    private List<FormFieldMapping> createMappings(Long formId, Long userId, List<Field> fields, int startOrder, boolean isRequired) {
+        List<FormFieldMapping> mappings = new ArrayList<>();
+        int order = startOrder;
+        for (Field field : fields) {
+            FormFieldMapping mapping = new FormFieldMapping();
+            mapping.setFormId(formId);
+            mapping.setFieldId(field.getId());
+            mapping.setIsRequired(isRequired);
+            mapping.setDisplayOrder(order++);
+            mapping.setCreatedBy(userId);
+            mapping.setUpdatedBy(userId);
+            mappings.add(mapping);
+        }
+        return mappings;
+    }
+
+    private List<FormFieldMapping> createCustomMappings(Long formId, FormCreateRequest request, List<Field> savedFields, int startOrder) {
+        List<FormFieldMapping> mappings = new ArrayList<>();
+        int order = startOrder;
+        for (int i = 0; i < savedFields.size(); i++) {
+            FieldRequest fr = request.getFields().get(i);
+            FormFieldMapping mapping = new FormFieldMapping();
+            mapping.setFormId(formId);
+            mapping.setFieldId(savedFields.get(i).getId());
+            mapping.setIsRequired(fr.getIsRequired());
+            mapping.setDisplayOrder(fr.getDisplayOrder() != null ? fr.getDisplayOrder() : order++);
+            mapping.setCreatedBy(request.getUserId());
+            mapping.setUpdatedBy(request.getUserId());
+            mappings.add(mapping);
+        }
+        return mappings;
+    }
+
+    private FormResponse buildFormResponse(Form form, List<FormFieldMapping> mappings) {
+        Map<Long, Field> fields = fetchFields(mappings.stream().map(FormFieldMapping::getFieldId).toList());
+        List<FieldResponse> resList = new ArrayList<>();
+        
+        for (FormFieldMapping mapping : mappings) {
+            Field field = fields.get(mapping.getFieldId());
+            if (field != null) {
+                resList.add(toResponse(field, mapping));
+            }
+        }
+
+        FormResponse response = new FormResponse();
+        response.setId(form.getId());
+        response.setTitle(form.getTitle());
+        response.setDescription(form.getDescription());
+        response.setFields(resList);
+        return response;
+    }
+
+    private void validateRequiredFields(List<FormFieldMapping> mappings, Map<Long, String> submittedValues) {
+        for (FormFieldMapping mapping : mappings) {
+            if (Boolean.TRUE.equals(mapping.getIsRequired())) {
+                String val = submittedValues.get(mapping.getFieldId());
+                if (val == null || val.trim().isEmpty()) {
+                    throw new RuntimeException("Required field missing: " + mapping.getFieldId());
                 }
             }
         }
-        return true;
     }
 
+    private List<FormValue> createFormValues(Long formId, Long uId, Map<Long, String> submittedValues, Map<Long, Field> fields) {
+        List<FormValue> vals = new ArrayList<>();
+        for (Map.Entry<Long, String> entry : submittedValues.entrySet()) {
+            Field field = fields.get(entry.getKey());
+            if (field == null) throw new RuntimeException("field not found");
+
+            boolean isValid = validators.stream()
+                    .filter(v -> v.supports(field.getDataType())).findFirst()
+                    .map(v -> v.validate(entry.getValue(), field.getOptionsJson())).orElse(true);
+
+            if (!isValid) throw new RuntimeException("invalid data type");
+
+            FormValue formValue = new FormValue();
+            formValue.setSubmittedBy(uId);
+            formValue.setFormId(formId);
+            formValue.setFieldId(field.getId());
+            formValue.setValue(entry.getValue());
+            formValue.setCreatedBy(uId);
+            formValue.setUpdatedBy(uId);
+            vals.add(formValue);
+        }
+        return vals;
+    }
+
+    private FieldAnswersResponse buildFieldAnswersResponse(Field field, FormFieldMapping mapping, List<FormValue> fieldValues) {
+        FieldAnswersResponse response = new FieldAnswersResponse();
+        response.setField(toResponse(field, mapping));
+
+        List<AnswerDetail> answers = new ArrayList<>();
+        for (FormValue value : fieldValues) {
+            AnswerDetail ans = new AnswerDetail();
+            ans.setSubmittedBy(value.getSubmittedBy());
+            ans.setValue(value.getValue());
+            ans.setUserId(value.getId());
+            answers.add(ans);
+        }
+        response.setAnswers(answers);
+        return response;
+    }
+
+    private Map<Long, Field> fetchFields(List<Long> fieldIds) {
+        return fieldRepository.findAllById(fieldIds).stream()
+                .collect(Collectors.toMap(Field::getId, Function.identity()));
+    }
+
+    private FieldResponse toResponse(Field field, FormFieldMapping mapping) {
+        FieldResponse fr = new FieldResponse();
+        fr.setFieldId(field.getId());
+        fr.setName(field.getName());
+        fr.setLabel(field.getLabel());
+        fr.setDataType(field.getDataType().name());
+        fr.setOptionsJson(field.getOptionsJson());
+        fr.setIsRequired(mapping.getIsRequired());
+        fr.setDisplayOrder(mapping.getDisplayOrder());
+        return fr;
+    }
 }

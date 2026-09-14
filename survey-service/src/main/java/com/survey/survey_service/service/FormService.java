@@ -2,6 +2,8 @@ package com.survey.survey_service.service;
 
 import com.survey.survey_service.dto.*;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface FormService {
 
@@ -11,9 +13,9 @@ public interface FormService {
     void submitForm(Long formId, FormSubmissionRequest request, Long uId);
 
 
-    List<FieldAnswersResponse> getFormResults(Long formId);
-
-    boolean validateField(String dataTypeName, String value, String optionsJson);
+    Page<FieldAnswersResponse> getFormResults(Long formId, Long requestingUserId, Pageable pageable);
 
 
+
+    void deleteUnansweredForms();
 }

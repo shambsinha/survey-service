@@ -1,11 +1,11 @@
 package com.survey.survey_service.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.Column;
+import java.time.Instant;
+
+import com.survey.survey_service.enums.DataType;
+import jakarta.persistence.*;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,19 +18,50 @@ public class Field {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name = "user_id")
-    private Long userId;
-    
-    @Column(name = "data_type_id")
-    private Long dataTypeId;
-    @Column(name="name")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "data_type", nullable = false)
+    private DataType dataType;
+
+    @Column(name="name", nullable = false)
     private String name;
-    @Column(name="label")
+
+    @Column(name="label", nullable = false)
     private String label;
     
-    @Column(name = "is_default")
-    private Boolean isDefault;
+    @Column(name = "is_system", nullable = false)
+    private Boolean isSystem = false;
+    
+    @Column(name = "is_default", nullable = false)
+    private Boolean isDefault = false;
 
     @Column(name = "options_json")
     private String optionsJson;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Column(name = "created_by")
+    private Long createdBy;
+
+    @Column(name = "updated_by")
+    private Long updatedBy;
+
+    @PrePersist
+    void onCreate() {
+        Instant now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
+    }
 }
