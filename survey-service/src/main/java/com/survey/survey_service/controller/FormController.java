@@ -1,13 +1,12 @@
 package com.survey.survey_service.controller;
 
-import com.survey.survey_service.dto.FormCreateRequest;
-import com.survey.survey_service.dto.FormResponse;
-import com.survey.survey_service.dto.FieldAnswersResponse;
-import com.survey.survey_service.dto.FormSubmissionRequest;
+import com.survey.survey_service.dto.*;
 import com.survey.survey_service.service.FormService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.Comparator;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +32,7 @@ public class FormController {
     @GetMapping("/{id}")
     public ResponseEntity<FormResponse> getForm(@PathVariable Long id) {
         FormResponse response = formService.getForm(id);
+        response.getFields().sort(Comparator.comparing(FieldResponse::getDisplayOrder));
         return ResponseEntity.ok(response);
     }
 

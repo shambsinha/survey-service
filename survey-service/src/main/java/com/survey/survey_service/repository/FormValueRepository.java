@@ -9,10 +9,6 @@ import java.util.List;
 
 @Repository
 public interface FormValueRepository extends JpaRepository<FormValue, Long> {
-    List<FormValue> findByFormId(Long formId);
     List<FormValue> findByFormIdAndFieldIdIn(Long formId, List<Long> fieldIds);
-
-    @Query("SELECT f.formId FROM FormValue f")
-    List<Long> findAllFormIdsInValues();
 
 }

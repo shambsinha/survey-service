@@ -50,4 +50,15 @@ public class AuthServiceImpl implements AuthService {
         
         throw new RuntimeException("Invalid username or password");
     }
+    @Override
+    public void register(RegisterRequest request) {
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+            throw new RuntimeException("Username already exists");
+        }
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(request.getPassword());
+        user.setRole(com.survey.survey_service.enums.Role.USER.name());
+        userRepository.save(user);
+    }
 }

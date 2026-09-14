@@ -23,4 +23,10 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
+
+    @PostMapping("/register")
+    public ResponseEntity<String> register(@RequestBody com.survey.survey_service.dto.RegisterRequest request) {
+        authService.register(request);
+        return ResponseEntity.ok("User registered!!!!!!!");
+    }
 }

@@ -42,15 +42,7 @@ public class FormServiceImpl implements FormService {
     @Transactional
     public void deleteUnansweredForms() {
         Instant thirtyDaysAgo = Instant.now().minus(30, ChronoUnit.DAYS);
-        List<Long> formIds = formRepository.findFormIdsCreatedBefore(thirtyDaysAgo);
-        List<Long> formIds2 = formValueRepository.findAllFormIdsInValues();
-        List<Long> toDelete = new ArrayList<>();
-        
-        for (Long formId : formIds) {
-            if (!formIds2.contains(formId)) {
-                toDelete.add(formId);
-            }
-        }
+        List<Long> toDelete = formRepository.findUnansweredFormIdsCreatedBefore(thirtyDaysAgo);
 
         if (!toDelete.isEmpty()) {
             List<Long> fieldsToDelete = formFieldMappingRepository.findByIdsIn(toDelete);
@@ -141,19 +133,33 @@ public class FormServiceImpl implements FormService {
     }
 
     private List<Field> saveCustomFields(FormCreateRequest request) {
-        List<Field> customFields = new ArrayList<>();
+        List<Field> processedFields = new ArrayList<>();
+        List<Field> toSave = new ArrayList<>();
         for (FieldRequest fr : request.getFields()) {
-            Field field = new Field();
-            field.setDataType(DataType.valueOf(fr.getDataType().toUpperCase()));
-            field.setName(fr.getName());
-            field.setLabel(fr.getLabel());
-            field.setOptionsJson(fr.getOptionsJson());
-            field.setIsDefault(false);
-            field.setCreatedBy(request.getUserId());
-            field.setUpdatedBy(request.getUserId());
-            customFields.add(field);
+            if (fr.getId() != null) {
+                Field systemField = fieldRepository.findById(fr.getId())
+                        .orElseThrow(() -> new RuntimeException("System field not found with ID: " + fr.getId()));
+                if (!Boolean.TRUE.equals(systemField.getIsSystem())) {
+                    throw new RuntimeException("Field is not a system field");
+                }
+                processedFields.add(systemField);
+            } else {
+                Field field = new Field();
+                field.setDataType(DataType.valueOf(fr.getDataType().toUpperCase()));
+                field.setName(fr.getName());
+                field.setLabel(fr.getLabel());
+                field.setOptionsJson(fr.getOptionsJson());
+                field.setIsDefault(false);
+                field.setCreatedBy(request.getUserId());
+                field.setUpdatedBy(request.getUserId());
+                toSave.add(field);
+                processedFields.add(field);
+            }
         }
-        return fieldRepository.saveAll(customFields);
+        if (!toSave.isEmpty()) {
+            fieldRepository.saveAll(toSave);
+        }
+        return processedFields;
     }
 
     private List<FormFieldMapping> createMappings(Long formId, Long userId, List<Field> fields, int startOrder, boolean isRequired) {
@@ -180,7 +186,7 @@ public class FormServiceImpl implements FormService {
             FormFieldMapping mapping = new FormFieldMapping();
             mapping.setFormId(formId);
             mapping.setFieldId(savedFields.get(i).getId());
-            mapping.setIsRequired(fr.getIsRequired());
+            mapping.setIsRequired(fr.getIsRequired() != null ? fr.getIsRequired() : false);
             mapping.setDisplayOrder(fr.getDisplayOrder() != null ? fr.getDisplayOrder() : order++);
             mapping.setCreatedBy(request.getUserId());
             mapping.setUpdatedBy(request.getUserId());

@@ -45,10 +45,9 @@ public class TokenFilter extends OncePerRequestFilter {
                     SessionUser sessionUser = objectMapper.readValue(sessionJson, SessionUser.class);
                     
                     String role = sessionUser.getRole();
-                    String authority = role.startsWith("ROLE_") ? role : "ROLE_" + role;
                     
                     UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                            sessionUser.getId(), null, Collections.singletonList(new SimpleGrantedAuthority(authority))
+                            sessionUser.getId(), null, Collections.singletonList(new SimpleGrantedAuthority(role))
                     );
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }

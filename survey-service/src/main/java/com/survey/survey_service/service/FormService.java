@@ -10,12 +10,10 @@ public interface FormService {
     FormResponse createForm(FormCreateRequest request);
 
     FormResponse getForm(Long formId);
+
     void submitForm(Long formId, FormSubmissionRequest request, Long uId);
 
-
     Page<FieldAnswersResponse> getFormResults(Long formId, Long requestingUserId, Pageable pageable);
-
-
 
     void deleteUnansweredForms();
 }
