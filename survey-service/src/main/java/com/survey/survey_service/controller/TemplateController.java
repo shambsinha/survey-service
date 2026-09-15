@@ -44,7 +44,6 @@ public class TemplateController {
     @PreAuthorize("hasRole(Role.ADMIN)")
     public ResponseEntity<FormResponse> updateTemplate(@PathVariable Long id, @RequestBody FormUpdateRequest request) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
         FormResponse response = formService.updateForm(id, request, userId);
         return ResponseEntity.ok(response);
     }

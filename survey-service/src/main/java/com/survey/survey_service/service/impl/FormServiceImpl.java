@@ -30,13 +30,15 @@ public class FormServiceImpl implements FormService {
     private final FormFieldMappingRepository formFieldMappingRepository;
     private final FormValueRepository formValueRepository;
     private final FieldValidatorMap validatorMap;
+    private final UserRepository userRepository;
     
-    public FormServiceImpl(FormRepository formRepository, FieldRepository fieldRepository, FormFieldMappingRepository formFieldMappingRepository, FormValueRepository formValueRepository, FieldValidatorMap validatorMap) {
+    public FormServiceImpl(FormRepository formRepository, FieldRepository fieldRepository, FormFieldMappingRepository formFieldMappingRepository, FormValueRepository formValueRepository, FieldValidatorMap validatorMap, UserRepository userRepository) {
         this.formRepository = formRepository;
         this.fieldRepository = fieldRepository;
         this.formFieldMappingRepository = formFieldMappingRepository;
         this.formValueRepository = formValueRepository;
         this.validatorMap=validatorMap;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -161,10 +163,19 @@ public class FormServiceImpl implements FormService {
         
         List<Long> fieldIds = mappings.stream().map(FormFieldMapping::getFieldId).toList();
         Map<Long, List<FormValue>> valuesByFieldId = new HashMap<>();
+        List<Long> userIds = new ArrayList<>();
         
         if (!fieldIds.isEmpty()) {
-            valuesByFieldId = formValueRepository.findByFormIdAndFieldIdIn(formId, fieldIds).stream()
+            List<FormValue> allValues = formValueRepository.findByFormIdAndFieldIdIn(formId, fieldIds);
+            valuesByFieldId = allValues.stream()
                     .collect(Collectors.groupingBy(FormValue::getFieldId));
+            userIds = allValues.stream().map(FormValue::getSubmittedBy).distinct().collect(Collectors.toList());
+        }
+
+        Map<Long, User> users = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            users = userRepository.findAllById(userIds).stream()
+                    .collect(Collectors.toMap(User::getId, Function.identity()));
         }
 
         Map<Long, Field> fields = fetchFields(fieldIds);
@@ -173,7 +184,7 @@ public class FormServiceImpl implements FormService {
         for (FormFieldMapping mapping : mappings) {
             Field field = fields.get(mapping.getFieldId());
             if (field != null) {
-                results.add(buildFieldAnswersResponse(field, mapping, valuesByFieldId.getOrDefault(field.getId(), new ArrayList<>())));
+                results.add(buildFieldAnswersResponse(field, mapping, valuesByFieldId.getOrDefault(field.getId(), new ArrayList<>()), users));
             }
         }
         
@@ -335,16 +346,20 @@ public class FormServiceImpl implements FormService {
         return vals;
     }
 
-    private FieldAnswersResponse buildFieldAnswersResponse(Field field, FormFieldMapping mapping, List<FormValue> fieldValues) {
+    private FieldAnswersResponse buildFieldAnswersResponse(Field field, FormFieldMapping mapping, List<FormValue> fieldValues, Map<Long, User> users) {
         FieldAnswersResponse response = new FieldAnswersResponse();
         response.setField(toResponse(field, mapping));
 
         List<AnswerDetail> answers = new ArrayList<>();
         for (FormValue value : fieldValues) {
             AnswerDetail ans = new AnswerDetail();
-            ans.setSubmittedBy(value.getSubmittedBy());
+            User user = users.get(value.getSubmittedBy());
+            if (user != null) {
+                ans.setSubmittedBy(new UserBasicInfo(user.getId(), user.getUsername()));
+            } else {
+                ans.setSubmittedBy(new UserBasicInfo(value.getSubmittedBy(), null));
+            }
             ans.setValue(value.getValue());
-            ans.setUserId(value.getId());
             answers.add(ans);
         }
         response.setAnswers(answers);

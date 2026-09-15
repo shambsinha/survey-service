@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class AnswerDetail {
-    private UserBasicInfo submittedBy;
-    private String value;
+public class UserBasicInfo {
+    private Long userId;
+    private String username;
 }
