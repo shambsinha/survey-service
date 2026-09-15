@@ -80,12 +80,68 @@ public class FormServiceImpl implements FormService {
 
     @Override
     @Transactional
+    public FormResponse updateForm(Long formId, FormUpdateRequest request, Long userId) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new RuntimeException("Form not found"));
+        
+        if (!form.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("Unauthorized: You do not have permission to edit this form");
+        }
+        
+        if (request.getTitle() != null) {
+            form.setTitle(request.getTitle());
+        }
+        if (request.getDescription() != null) {
+            form.setDescription(request.getDescription());
+        }
+        form.setUpdatedBy(userId);
+        form = formRepository.save(form);
+        
+        return buildFormResponse(form, formFieldMappingRepository.findByFormId(formId));
+    }
+
+    @Override
+    @Transactional
+    public void deleteForm(Long formId, Long userId) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new RuntimeException("Form not found"));
+        
+        if (!form.getCreatedBy().equals(userId)) {
+            throw new RuntimeException("Unauthorized: You do not have permission to delete this form");
+        }
+        
+        formValueRepository.deleteByFormId(formId);
+        formFieldMappingRepository.deleteByFormId(formId);
+        formRepository.deleteById(formId);
+    }
+
+    @Override
+    @Transactional
+    public FormResponse createFormFromTemplate(Long templateId, Long userId) {
+        Form templateForm = formRepository.findById(templateId)
+                .orElseThrow(() -> new RuntimeException("Template form not found"));
+        if (!Boolean.TRUE.equals(templateForm.getIsTemplate())) {
+            throw new RuntimeException("Invalid form Id");
+        }
+        Form newForm = cloneFormFromTemplate(templateForm, userId);
+        List<FormFieldMapping> newMappings = cloneFormMappings(newForm.getId(), templateId, userId);
+        return buildFormResponse(newForm, newMappings);
+    }
+
+    @Override
+    public List<FormResponse> getTemplateForms() {
+        List<Form> templates = formRepository.findByIsTemplateTrue();
+        return templates.stream()
+                .map(form -> buildFormResponse(form, formFieldMappingRepository.findByFormId(form.getId())))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
     public void submitForm(Long formId, FormSubmissionRequest request, Long uId) {
         List<FormFieldMapping> mappings = formFieldMappingRepository.findByFormId(formId);
         Map<Long, String> submittedValues = request.getValues() != null ? request.getValues() : new HashMap<>();
-        
         validateRequiredFields(mappings, submittedValues);
-
         if (!submittedValues.isEmpty()) {
             Map<Long, Field> fields = fetchFields(new ArrayList<>(submittedValues.keySet()));
             List<FormValue> vals = createFormValues(formId, uId, submittedValues, fields);
@@ -130,7 +186,36 @@ public class FormServiceImpl implements FormService {
         form.setUpdatedBy(request.getUserId());
         form.setTitle(request.getTitle());
         form.setDescription(request.getDescription());
+        form.setIsTemplate(request.getIsTemplate() != null ? request.getIsTemplate() : false);
         return formRepository.save(form);
+    }
+
+    private Form cloneFormFromTemplate(Form templateForm, Long userId) {
+        Form newForm = new Form();
+        newForm.setCreatedBy(userId);
+        newForm.setUpdatedBy(userId);
+        newForm.setTitle(templateForm.getTitle());
+        newForm.setDescription(templateForm.getDescription());
+        newForm.setIsTemplate(false);
+        return formRepository.save(newForm);
+    }
+
+    private List<FormFieldMapping> cloneFormMappings(Long newFormId, Long templateId, Long userId) {
+        List<FormFieldMapping> templateMappings = formFieldMappingRepository.findByFormId(templateId);
+        List<FormFieldMapping> newMappings = new ArrayList<>();
+        
+        for (FormFieldMapping tm : templateMappings) {
+            FormFieldMapping nm = new FormFieldMapping();
+            nm.setFormId(newFormId);
+            nm.setFieldId(tm.getFieldId());
+            nm.setIsRequired(tm.getIsRequired());
+            nm.setDisplayOrder(tm.getDisplayOrder());
+            nm.setCreatedBy(userId);
+            nm.setUpdatedBy(userId);
+            newMappings.add(nm);
+        }
+        formFieldMappingRepository.saveAll(newMappings);
+        return newMappings;
     }
 
     private List<Field> saveCustomFields(FormCreateRequest request) {
@@ -211,6 +296,7 @@ public class FormServiceImpl implements FormService {
         response.setId(form.getId());
         response.setTitle(form.getTitle());
         response.setDescription(form.getDescription());
+        response.setIsTemplate(form.getIsTemplate());
         response.setFields(resList);
         return response;
     }

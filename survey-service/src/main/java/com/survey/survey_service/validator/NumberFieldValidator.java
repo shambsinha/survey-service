@@ -6,8 +6,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class NumberFieldValidator implements FieldValidator {
     @Override
-    public boolean supports(DataType dataType) {
-        return dataType == DataType.NUMBER;
+    public DataType getSupportedType() {
+        return DataType.NUMBER;
     }
 
     @Override

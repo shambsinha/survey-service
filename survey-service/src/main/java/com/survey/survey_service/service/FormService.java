@@ -9,7 +9,15 @@ public interface FormService {
 
     FormResponse createForm(FormCreateRequest request);
 
+    FormResponse updateForm(Long formId, FormUpdateRequest request, Long userId);
+
+    void deleteForm(Long formId, Long userId);
+
     FormResponse getForm(Long formId);
+
+    FormResponse createFormFromTemplate(Long templateId, Long userId);
+
+    List<FormResponse> getTemplateForms();
 
     void submitForm(Long formId, FormSubmissionRequest request, Long uId);
 

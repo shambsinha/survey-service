@@ -17,4 +17,5 @@ public interface FormFieldMappingRepository extends JpaRepository<FormFieldMappi
     @Query("SELECT f.fieldId FROM FormFieldMapping f WHERE f.formId IN :ids")
     List<Long> findByIdsIn(List<Long> ids);
 
+    void deleteByFormId(Long formId);
 }

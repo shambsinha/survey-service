@@ -25,6 +25,7 @@ public class FormController {
     public ResponseEntity<FormResponse> createForm(@RequestBody FormCreateRequest request) {
         Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         request.setUserId(userId);
+        request.setIsTemplate(false);
         FormResponse response = formService.createForm(request);
         return ResponseEntity.ok(response);
     }
@@ -33,6 +34,27 @@ public class FormController {
     public ResponseEntity<FormResponse> getForm(@PathVariable Long id) {
         FormResponse response = formService.getForm(id);
         response.getFields().sort(Comparator.comparing(FieldResponse::getDisplayOrder));
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<FormResponse> updateForm(@PathVariable Long id, @RequestBody FormUpdateRequest request) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        FormResponse response = formService.updateForm(id, request, userId);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteForm(@PathVariable Long id) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        formService.deleteForm(id, userId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/use-template/{templateId}")
+    public ResponseEntity<FormResponse> createFromTemplate(@PathVariable Long templateId) {
+        Long userId = (Long) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        FormResponse response = formService.createFormFromTemplate(templateId, userId);
         return ResponseEntity.ok(response);
     }
 

@@ -34,7 +34,6 @@ public class TokenFilter extends OncePerRequestFilter {
         if (token != null && token.startsWith("Bearer ")) {
             token = token.substring(7);
         } else {
-
             token = request.getHeader("token");
         }
 

@@ -10,5 +10,5 @@ import java.util.List;
 @Repository
 public interface FormValueRepository extends JpaRepository<FormValue, Long> {
     List<FormValue> findByFormIdAndFieldIdIn(Long formId, List<Long> fieldIds);
-
+    void deleteByFormId(Long formId);
 }

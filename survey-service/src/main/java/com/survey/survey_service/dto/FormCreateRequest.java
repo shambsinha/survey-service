@@ -10,5 +10,6 @@ public class FormCreateRequest {
     private Long userId;
     private String title;
     private String description;
+    private Boolean isTemplate = false;
     private List<FieldRequest> fields;
 }

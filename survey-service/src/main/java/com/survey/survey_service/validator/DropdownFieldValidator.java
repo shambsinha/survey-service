@@ -11,8 +11,8 @@ public class DropdownFieldValidator implements FieldValidator {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
-    public boolean supports(DataType dataType) {
-        return dataType == DataType.DROPDOWN;
+    public DataType getSupportedType() {
+        return DataType.DROPDOWN;
     }
 
     @Override

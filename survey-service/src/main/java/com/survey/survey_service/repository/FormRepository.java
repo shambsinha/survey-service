@@ -17,4 +17,5 @@ public interface FormRepository extends JpaRepository<Form, Long> {
     @Query("SELECT f.id FROM Form f WHERE f.createdAt < :thirtyDaysAgo AND f.id NOT IN (SELECT v.formId FROM FormValue v)")
     List<Long> findUnansweredFormIdsCreatedBefore(@Param("thirtyDaysAgo") Instant thirtyDaysAgo);
 
+    List<Form> findByIsTemplateTrue();
 }

@@ -20,6 +20,9 @@ public class Form {
     @Column(name = "description")
     private String description;
 
+    @Column(name = "is_template")
+    private Boolean isTemplate = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

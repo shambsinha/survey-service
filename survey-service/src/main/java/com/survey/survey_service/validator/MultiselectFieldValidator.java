@@ -11,8 +11,8 @@ public class MultiselectFieldValidator implements FieldValidator {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Override
-    public boolean supports(DataType dataType) {
-        return dataType == DataType.MULTISELECT;
+    public DataType getSupportedType() {
+        return DataType.MULTISELECT;
     }
 
     @Override

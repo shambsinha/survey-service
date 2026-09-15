@@ -13,11 +13,7 @@ public class FieldValidatorMap {
 
     public FieldValidatorMap(List<FieldValidator> validators) {
         for (FieldValidator validator : validators) {
-            for (DataType dataType : DataType.values()) {
-                if (validator.supports(dataType)) {
-                    validatorMap.put(dataType, validator);
-                }
-            }
+            validatorMap.put(validator.getSupportedType(), validator);
         }
     }
 
